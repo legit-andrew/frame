@@ -43,6 +43,7 @@
   --veil: rgba(16, 16, 16, 0.6);
   --mark: rgba(255, 255, 255, 0.92);
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --shadow-up: 0 -10px 34px rgba(0, 0, 0, 0.45);
   --font: 'Fixel', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color-scheme: dark;
 }
@@ -66,6 +67,7 @@
   --veil: rgba(233, 233, 233, 0.66);
   --mark: #1b1b1b;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  --shadow-up: 0 -10px 34px rgba(0, 0, 0, 0.12);
   color-scheme: light;
 }
 
@@ -102,7 +104,7 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px 0 18px;
+  padding: 0 max(12px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   position: relative;
@@ -119,9 +121,10 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
   min-height: 0;
   background: var(--surface);
   border-left: 1px solid var(--line);
+  padding-right: env(safe-area-inset-right);
 }
 .panel-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; }
-.panel-foot { border-top: 1px solid var(--line); padding: 14px 20px 18px; display: grid; gap: 10px; background: var(--surface); }
+.panel-foot { border-top: 1px solid var(--line); padding: 14px 20px max(18px, env(safe-area-inset-bottom)); display: grid; gap: 10px; background: var(--surface); }
 .sheet-head { display: none; }
 
 /* ---------- buttons ---------- */
@@ -180,7 +183,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
 .cm.br { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
 
 /* ---------- library grid ---------- */
-.library { padding: 18px 24px 48px; }
+.library { padding: 18px 24px 48px max(24px, env(safe-area-inset-left)); }
 .lib-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 14px; min-height: 32px; }
 .lib-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .lib-head .hint { color: var(--text-3); font-size: 13px; }
@@ -363,29 +366,67 @@ input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; font-size: 13px; color: var(--text-2); }
 .keys kbd { justify-self: start; }
 
-/* ---------- mobile ---------- */
+/* ---------- phones held upright ----------
+   The settings slide up from behind the bottom bar and stop at half height. While they are open the
+   previews line up in one row in the room above the sheet, so every change shows on them; the grip pulls
+   the sheet higher (the row shrinks but never goes) or down to close. Phones on their side and tablets
+   keep the side-by-side layout, where the previews are always in sight. */
 .mbar { display: none; }
-.backdrop { display: none; }
-@media (max-width: 860px) {
+@media (max-width: 860px) and (orientation: portrait) {
+  :root {
+    --mbar-h: calc(56px + max(10px, env(safe-area-inset-bottom)));
+    --sheet-room: calc(100dvh - 52px - var(--mbar-h));
+    --sheet-half: clamp(240px, calc(var(--sheet-room) - 250px), min(calc(var(--sheet-room) * 0.62), 520px));
+    --sheet-full: calc(var(--sheet-room) - max(128px, var(--sheet-room) * 0.22));
+  }
   .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); }
   .bar { padding: 0 6px 0 14px; }
   .count { display: none; }
   .bar .btn .lbl-wide { display: none; }
-  .library { padding: 14px 14px 120px; }
+  .library { padding: 14px 14px calc(var(--mbar-h) + 54px); }
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px 10px; }
+  .cell { transform-origin: 0 0; }
+  /* the row of previews above the open sheet; its height and the preview size come from the script */
+  .app[data-sheet] .stage { overflow: hidden; }
+  .app[data-sheet] .library { height: var(--strip-h, 0px); padding: 0; display: flex; flex-direction: column; justify-content: center; }
+  .app[data-sheet] .lib-head, .app[data-sheet] .note { display: none; }
+  .app[data-sheet] .grid {
+    display: flex; gap: 10px; padding: 12px 14px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity; scroll-padding: 0 14px; scrollbar-width: none;
+  }
+  .app[data-sheet] .grid::-webkit-scrollbar { display: none; }
+  /* while previews glide up into the row, it lets them through below its edge (the sheet covers that part) */
+  .app[data-sheet] .grid.morphing { padding-bottom: 50vh; margin-bottom: calc(12px - 50vh); }
+  .app[data-sheet] .cell { flex: none; width: var(--tile, 150px); scroll-snap-align: start; }
+  /* one or two previews sit in the middle; a longer row starts at the edge and scrolls */
+  .app[data-sheet] .cell:first-child { margin-left: auto; }
+  .app[data-sheet] .cell:last-child { margin-right: auto; }
+  .app[data-strip='compact'] .cap, .app[data-strip='narrow'] .cap .nm { display: none; }
+  /* on small previews a badge keeps only its icon, clear of the remove button */
+  .app[data-strip] .badge { font-size: 0; gap: 0; padding: 0 5px; }
+  .app[data-strip] .badge:not(:has(svg, .spin)) { display: none; }
   .pic { inset: 8px; }
   .cell-tools { opacity: 1; }
   .panel {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; max-height: 88dvh;
-    border-left: 0; border-radius: 16px 16px 0 0; box-shadow: var(--shadow);
-    transform: translateY(104%); transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); visibility: hidden;
+    position: fixed; left: 0; right: 0; bottom: var(--mbar-h); z-index: 39; max-height: var(--sheet-half);
+    border-left: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -1px 0 var(--line), var(--shadow-up);
+    transform: translateY(calc(100% + 16px)); visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.28s;
   }
-  .app[data-sheet='open'] .panel { transform: none; visibility: visible; }
-  .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 4px 20px; }
-  .sheet-head b { font-size: 15px; font-weight: 600; }
-  .panel-foot { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-  .backdrop { display: block; position: fixed; inset: 0; z-index: 45; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-  .app[data-sheet='open'] ~ .backdrop { opacity: 1; pointer-events: auto; }
+  .app[data-sheet] .panel { transform: none; visibility: visible; transition-delay: 0s; }
+  .app[data-sheet][data-sheet-size='full'] .panel { max-height: var(--sheet-full); }
+  .panel.dragging { transition: none !important; }
+  .sheet-head { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 12px 8px 0 20px; touch-action: none; }
+  .sheet-grip { position: absolute; inset: 0; padding: 0; border: 0; border-radius: 16px 16px 0 0; background: none; cursor: grab; touch-action: none; }
+  .sheet-grip::before { content: ''; position: absolute; left: 50%; top: 7px; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line-2); transition: background-color 0.15s; }
+  .sheet-grip:hover::before, .panel.dragging .sheet-grip::before { background: var(--text-3); }
+  .sheet-grip:focus-visible { outline-offset: -3px; }
+  .sheet-head b { position: relative; font-size: 15px; font-weight: 600; pointer-events: none; }
+  .sheet-head .icon-btn { position: relative; z-index: 1; }
+  /* the bottom bar keeps the summary and the export button, so the sheet itself only adds progress and results */
+  .panel-foot { padding: 12px 16px; }
+  .panel-foot > .summary, .panel-foot > #export-btn { display: none; }
+  .panel-foot:not(:has(> #cancel-btn:not([hidden]), > .result:not([hidden]))) { display: none; }
   .mbar {
     display: flex; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom));
@@ -393,6 +434,8 @@ input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius
   }
   .mbar .btn { height: 46px; border-radius: 10px; }
   .mbar .set { flex: 1; min-width: 0; justify-content: flex-start; padding: 0 12px; gap: 6px; overflow: hidden; }
+  .mbar .set[aria-expanded='true'] { background: var(--raised); }
+  .mbar .set[aria-expanded='true'] > svg.i { color: var(--safe-text); }
   .mbar .set .tok { flex: none; }
   .mbar .go { flex: none; min-width: 132px; position: relative; overflow: hidden; }
   .app[data-empty='true'] ~ .mbar { display: none; }
@@ -400,7 +443,7 @@ input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius
   .finder p { font-size: 15px; }
   .readout.br { display: none; }
   .readout.bl { left: 24px; right: 24px; }
-  .toasts { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .toasts { bottom: calc(var(--mbar-h) + 18px); }
   .ed-bottom .ed-row .btn { height: 42px; }
 }
 @media (hover: none) {
@@ -702,7 +745,7 @@ button svg, .btn svg { pointer-events: none; }
   </main>
 
   <aside class="panel" id="panel">
-    <div class="sheet-head"><b data-t="settings"></b><button class="icon-btn" type="button" data-close-sheet data-t-aria="close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-head"><button class="sheet-grip" type="button" id="sheet-grip" aria-controls="panel" aria-expanded="false"></button><b data-t="settings"></b><button class="icon-btn" type="button" data-close-sheet data-t-aria="close"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="panel-scroll">
       <section class="group" id="g-format">
         <h2 data-t="g.format"></h2>
@@ -798,10 +841,9 @@ button svg, .btn svg { pointer-events: none; }
     </footer>
   </aside>
 </div>
-<div class="backdrop" id="backdrop" data-close-sheet></div>
 
 <nav class="mbar" id="mbar">
-  <button class="btn set" type="button" id="m-settings" data-t-aria="settings"><svg class="i"><use href="#i-adjustments-horizontal"/></svg><span class="summary" id="m-summary"></span></button>
+  <button class="btn set" type="button" id="m-settings" data-t-aria="settings" aria-controls="panel" aria-expanded="false"><svg class="i"><use href="#i-adjustments-horizontal"/></svg><span class="summary" id="m-summary"></span></button>
   <button class="btn primary go" type="button" id="m-export"><span class="fill"></span><span class="lbl" id="m-export-lbl"></span></button>
 </nav>
 
@@ -3302,6 +3344,8 @@ const I18N = {
     'cell.fromVideo': 'Кадр з відео',
     'warn.small': 'Рендер {w}, а сенсор {r}. Більше без проявки raw не отримати.',
     settings: 'Налаштування',
+    'sheet.more': 'Розгорнути налаштування',
+    'sheet.less': 'Згорнути налаштування',
     'g.format': 'Формат',
     'f.png': 'без втрат',
     'f.jpeg': 'компактний',
@@ -3600,6 +3644,8 @@ const I18N = {
     'cell.fromVideo': 'Video still',
     'warn.small': 'The render is {w} but the sensor is {r}. More would need a raw development.',
     settings: 'Settings',
+    'sheet.more': 'Expand settings',
+    'sheet.less': 'Collapse settings',
     'g.format': 'Format',
     'f.png': 'lossless',
     'f.jpeg': 'compact',
@@ -4271,6 +4317,7 @@ function removeItem(it) {
 function renderLibrary() {
   const n = S.items.length;
   app.dataset.empty = n ? 'false' : 'true';
+  if (!n) closeSheet(); // the bottom bar it opens from goes away with the last file
   $('#empty').hidden = !!n;
   $('#library').hidden = !n;
   $('#clear-btn').hidden = !n;
@@ -4285,6 +4332,7 @@ function renderLibrary() {
     updateCell(it);
   });
   while (grid.children.length > S.items.length) grid.lastChild.remove();
+  layoutStrip(); // the row above an open settings sheet sizes its previews by how many there are
   updateSummary();
 }
 
@@ -4713,6 +4761,214 @@ function bindPanel() {
   $('#convert').addEventListener('change', (e) => { S.set.color.convert = e.target.checked; changed(); });
   $('#keep-meta').addEventListener('change', (e) => { S.set.meta.keep = e.target.checked; changed(); });
   $('#strip-gps').addEventListener('change', (e) => { S.set.meta.stripGPS = e.target.checked; changed(); });
+}
+
+/* 35-sheet.js */
+/* ---------- settings sheet on phones held upright ---------- */
+// The sheet opens at half height above the bottom bar. While it is open, the previews line up in one row in
+// the room between the top bar and the sheet, so every change shows on them; the row scrolls sideways and
+// follows the sheet's height. The grip pulls the sheet higher (the row shrinks but stays) or down to close;
+// a tap on the grip switches size. Everywhere else the panel sits beside the library and these calls only
+// keep the state.
+const SHEET_MQ = matchMedia('(max-width: 860px) and (orientation: portrait)');
+const sheetOn = () => SHEET_MQ.matches;
+const stripOn = () => !!app.dataset.sheet && sheetOn();
+const sheetPanel = $('#panel'), sheetGrip = $('#sheet-grip');
+
+// One of the sheet's CSS sizes in pixels.
+function sheetPx(name) {
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:absolute;left:0;top:0;width:0;visibility:hidden;pointer-events:none;height:var(${name})`;
+  app.appendChild(probe);
+  const h = probe.offsetHeight;
+  probe.remove();
+  return h;
+}
+// Where the sheet stops; one with little in it stops where its content ends.
+function sheetStops() {
+  const natural = $('.sheet-head', sheetPanel).offsetHeight + $('.panel-scroll', sheetPanel).scrollHeight + $('#foot').offsetHeight;
+  const low = Math.min(sheetPx('--sheet-half'), natural);
+  return { low, high: Math.max(low, Math.min(sheetPx('--sheet-full'), natural)) };
+}
+
+/* the row of previews above the open sheet (sizes match the CSS: padding, side margin, gap, caption) */
+const STRIP = { pad: 12, side: 14, gap: 10, cap: 26, peek: 36, small: 96 };
+// Sizes the row to the room left above the sheet. One preview takes the width, two share it, and with more
+// a part of the next one shows, so the row reads as scrollable. When the sheet is pulled high the names and
+// sizes under the previews give way to the pictures.
+function layoutStrip() {
+  if (!stripOn()) return;
+  const stage = $('#stage');
+  const h = Math.max(0, Math.floor($('#mbar').getBoundingClientRect().top - stage.getBoundingClientRect().top - sheetPanel.offsetHeight));
+  const n = $('#grid').children.length;
+  const w = stage.clientWidth - 2 * STRIP.side;
+  const across = n <= 1 ? w : n === 2 ? (w - STRIP.gap) / 2 : (w + STRIP.side - 2 * STRIP.gap - STRIP.peek) / 2;
+  const roomy = h - 2 * STRIP.pad - STRIP.cap >= STRIP.small;
+  const tall = roomy ? h - 2 * STRIP.pad - STRIP.cap : Math.min(STRIP.small, h - 2 * STRIP.pad);
+  const side = Math.max(40, Math.floor(Math.min(across, tall)));
+  app.style.setProperty('--strip-h', h + 'px');
+  app.style.setProperty('--tile', side + 'px');
+  // small previews keep the output size under them and drop the file name, which would not fit anyway
+  if (!roomy) app.dataset.strip = 'compact';
+  else if (side < 136) app.dataset.strip = 'narrow';
+  else delete app.dataset.strip;
+}
+
+// The preview that leads the view: the first one mostly in sight, in the grid or in the row.
+function leadCell() {
+  const grid = $('#grid');
+  if ($('#library').hidden) return null;
+  const row = stripOn();
+  const v = (row ? grid : $('#stage')).getBoundingClientRect();
+  for (const li of grid.children) {
+    const r = li.getBoundingClientRect();
+    if (row ? r.left + r.width / 2 > v.left : r.top + r.height / 2 > v.top) return li;
+  }
+  return null;
+}
+// Scrolls the row or the grid so that preview leads again.
+function bringToFront(li) {
+  if (!li || !li.isConnected) return;
+  const r = li.getBoundingClientRect();
+  if (stripOn()) {
+    const grid = $('#grid');
+    grid.scrollLeft += r.left - grid.getBoundingClientRect().left - STRIP.side;
+  } else {
+    const stage = $('#stage');
+    // a preview in the first row brings back the heading too
+    if (Math.abs(r.top - $('#grid').firstElementChild.getBoundingClientRect().top) < 2) stage.scrollTop = 0;
+    else stage.scrollTop += r.top - stage.getBoundingClientRect().top - 14;
+  }
+}
+
+// Switches the previews between the grid and the row. The grid row that leads the view glides into the
+// row (or back out of it); the other previews in sight fade in where they land, so nothing flies across.
+function morph(lead, change) {
+  const grid = $('#grid');
+  if (REDUCED || !lead || !sheetOn()) { change(); return; }
+  const toRow = !stripOn();
+  const seen = (r, v) => r.width > 0 && r.bottom > v.top && r.top < v.bottom && r.right > v.left && r.left < v.right;
+  const inSight = () => {
+    const v = $('#stage').getBoundingClientRect(), m = new Map();
+    for (const li of grid.children) { const r = li.getBoundingClientRect(); if (seen(r, v)) m.set(li, r); }
+    return m;
+  };
+  const was = inSight(); // where they show now, part way through an earlier glide included
+  for (const li of grid.children) for (const a of li.getAnimations()) if (a.id === 'morph') a.cancel();
+  change();
+  const now = inSight();
+  // the leading grid row: before the change when the row forms, after it when the grid comes back
+  const rowOf = toRow ? was : now;
+  const top = rowOf.has(lead) ? rowOf.get(lead).top : NaN;
+  const ease = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+  const flights = [];
+  for (const [li, b] of now) {
+    const a = was.get(li), r = rowOf.get(li);
+    if (a && r && Math.abs(r.top - top) < 2) {
+      flights.push(li.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width})` }, { transform: 'none' }],
+        { id: 'morph', duration: 280, easing: ease }));
+    } else {
+      li.animate([{ opacity: 0 }, { opacity: 1 }], { id: 'morph', duration: 220, delay: 80, easing: 'ease-out', fill: 'backwards' });
+    }
+  }
+  // previews gliding up into the row are not cut at its lower edge on the way (the sheet covers that part)
+  if (toRow && flights.length) {
+    grid.classList.add('morphing');
+    const tok = (grid._morph = (grid._morph || 0) + 1);
+    Promise.all(flights.map((a) => a.finished.catch(() => {}))).then(() => { if (grid._morph === tok) grid.classList.remove('morphing'); });
+  }
+  const head = $('.lib-head');
+  if (!toRow && head.getBoundingClientRect().bottom > $('#stage').getBoundingClientRect().top) {
+    head.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 80, easing: 'ease-out', fill: 'backwards' });
+  }
+}
+
+function syncSheet() {
+  const full = app.dataset.sheetSize === 'full';
+  $('#m-settings').setAttribute('aria-expanded', String(!!app.dataset.sheet));
+  sheetGrip.setAttribute('aria-expanded', String(full));
+  sheetGrip.setAttribute('aria-label', t(full ? 'sheet.less' : 'sheet.more'));
+}
+function setSheetFull(full) {
+  if (full) app.dataset.sheetSize = 'full';
+  else delete app.dataset.sheetSize;
+  syncSheet();
+}
+function openSheet() {
+  if (app.dataset.sheet) return;
+  const lead = sheetOn() ? leadCell() : null;
+  morph(lead, () => {
+    app.dataset.sheet = 'open';
+    setSheetFull(false);
+    layoutStrip();
+    bringToFront(lead);
+  });
+}
+function closeSheet() {
+  if (!app.dataset.sheet) return;
+  const inside = sheetPanel.contains(document.activeElement);
+  const lead = stripOn() ? leadCell() : null;
+  morph(lead, () => {
+    delete app.dataset.sheet;
+    setSheetFull(false);
+    bringToFront(lead);
+  });
+  if (inside && sheetOn()) $('#m-settings').focus({ preventScroll: true });
+}
+const toggleSheet = () => (app.dataset.sheet ? closeSheet() : openSheet());
+
+function bindSheet() {
+  let drag = null, skipClick = false;
+  const release = () => {
+    sheetPanel.classList.remove('dragging');
+    sheetPanel.style.maxHeight = '';
+    sheetPanel.style.transform = '';
+  };
+  sheetGrip.addEventListener('pointerdown', (e) => {
+    if (!sheetOn() || e.button > 0) return;
+    const { low, high } = sheetStops();
+    const h0 = sheetPanel.getBoundingClientRect().height;
+    drag = { id: e.pointerId, y0: e.clientY, h0, h: h0, low, high, t: e.timeStamp, v: 0, moved: false };
+    sheetGrip.setPointerCapture(e.pointerId);
+  });
+  sheetGrip.addEventListener('pointermove', (e) => {
+    const d = drag;
+    if (!d || d.id !== e.pointerId) return;
+    const dy = e.clientY - d.y0;
+    if (!d.moved) {
+      if (Math.abs(dy) < 6) return;
+      d.moved = true;
+      sheetPanel.classList.add('dragging');
+    }
+    const h = Math.max(0, Math.min(d.high, d.h0 - dy));
+    d.v = 0.6 * ((d.h - h) / Math.max(1, e.timeStamp - d.t)) + 0.4 * d.v; // px per ms, positive while pulled down
+    d.h = h;
+    d.t = e.timeStamp;
+    // above the low stop the sheet grows; below it, it slides down whole
+    sheetPanel.style.maxHeight = Math.max(h, d.low) + 'px';
+    sheetPanel.style.transform = h < d.low ? `translateY(${d.low - h}px)` : 'none';
+  });
+  const end = (e) => {
+    const d = drag;
+    if (!d || d.id !== e.pointerId) return;
+    drag = null;
+    if (!d.moved) return; // a tap: the click switches the size
+    skipClick = true;
+    setTimeout(() => { skipClick = false; }, 0);
+    const v = e.timeStamp - d.t > 90 ? 0 : d.v; // a finger that stopped before letting go is no flick
+    const aim = d.h - v * 160; // where a flick was heading
+    release();
+    if (aim < d.low * 0.6) closeSheet();
+    else setSheetFull(d.high - d.low > 24 && aim - d.low > d.high - aim);
+  };
+  sheetGrip.addEventListener('pointerup', end);
+  sheetGrip.addEventListener('pointercancel', end);
+  sheetGrip.addEventListener('click', () => { if (!skipClick) setSheetFull(app.dataset.sheetSize !== 'full'); });
+  // the row of previews follows the sheet as it grows, shrinks or is dragged, and the screen size
+  new ResizeObserver(() => layoutStrip()).observe(sheetPanel);
+  window.addEventListener('resize', layoutStrip);
+  // turning the phone switches between the sheet and the side panel
+  SHEET_MQ.addEventListener('change', () => { drag = null; release(); closeSheet(); });
 }
 
 /* 40-editor.js */
@@ -6511,7 +6767,7 @@ async function startExport() {
   if (failed) toast(t('toast.someFailed', { n: failed }), 'err');
   showResults();
   updateSummary();
-  if (COARSE && matchMedia('(max-width: 860px)').matches) openSheet();
+  if (COARSE && sheetOn()) openSheet();
 }
 
 function collectResults() {
@@ -6642,6 +6898,7 @@ function applyStatic() {
   $('#keys').innerHTML = keys.map(([k, v]) => `<kbd>${esc(k)}</kbd><span>${esc(t(v))}</span>`).join('');
   setPressed($$('#lang-seg button'), (b) => b.dataset.lang === LANG);
   renderPresetSelect();
+  syncSheet();
 }
 
 function setLang(lang) {
@@ -6668,9 +6925,6 @@ function setTheme(th) {
   store.set('frame.theme', th);
   if (VV.item) { renderMarks(); paintScale(); }
 }
-
-function openSheet() { app.dataset.sheet = 'open'; }
-function closeSheet() { delete app.dataset.sheet; }
 
 async function collectEntries(entries) {
   const out = [];
@@ -6702,7 +6956,7 @@ function bindInputs() {
   if (COARSE) $('#paste-hint').hidden = true;
   $('#theme-btn').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   $('#lang-seg').addEventListener('click', (e) => { const b = e.target.closest('[data-lang]'); if (b && b.dataset.lang !== LANG) setLang(b.dataset.lang); });
-  $('#m-settings').addEventListener('click', openSheet);
+  $('#m-settings').addEventListener('click', toggleSheet);
   $$('[data-close-sheet]').forEach((el) => el.addEventListener('click', closeSheet));
 
   const drop = $('#drop');
@@ -6762,6 +7016,7 @@ function bindInputs() {
   bindEditor();
   bindVideo();
   bindExport();
+  bindSheet();
   bindInputs();
   applyStatic();
   setTheme(store.get('frame.theme') === 'light' ? 'light' : 'dark');
